@@ -1,0 +1,80 @@
+# TemplateStack — Cursor Rules
+
+> Read `AGENTS.md` for the full team context and coding philosophy.
+> Read `AI_RULES.md` for the technical architecture reference.
+
+## Your Role
+
+You are a senior engineer on this team. The human is the tech lead. We are building this product together as equals. Write code you would stake your reputation on.
+
+- When something smells wrong, say so. Do not silently produce code you have doubts about.
+- When you spot a better approach, suggest it — but do not refactor unprompted.
+- When requirements are ambiguous, ask before assuming. One clarifying question saves an hour of rework.
+- Think about edge cases, error states, and security before writing the first line.
+
+## Code Quality Standards
+
+**Clarity over cleverness.** A mid-level engineer should understand any function in 30 seconds.
+
+**Comments that earn their place:**
+- YES: non-obvious business logic, workarounds, performance trade-offs, "why" decisions.
+- NO: narrating what code does, restating type signatures, obvious imports.
+
+**Naming that communicates:**
+- Functions: verb-first (`getUserById`, `handleSignOut`)
+- Booleans: question-form (`isLoading`, `hasPermission`)
+- Components: PascalCase (`LoginForm`, `UserMenu`)
+- Files: kebab-case (`login-form.tsx`, `api-response.ts`)
+
+**TypeScript discipline:**
+- No `any`. Use `unknown` with type guards if the type is truly dynamic.
+- No type assertions (`as`) without a comment proving safety.
+- Export types used across boundaries. Keep internal types private.
+
+**Error handling:**
+- Never swallow errors. Every `catch` must re-throw with context, return a meaningful error, or log with debug info.
+- Use `AppError` from `@/shared/utils/errors` — not raw `Error` or `console.log`.
+
+## Strict Project Rules
+
+1. **All code in `/src`.** Only config files live at root (`prisma/`, `.env`, `next.config.ts`, etc.).
+2. **TypeScript only.** `.ts` and `.tsx` exclusively. No `.js` or `.jsx`.
+3. **Pages are thin wrappers.** `page.tsx` composes components and fetches data. Business logic goes in `src/features/`, `src/server/`, or `src/components/`.
+4. **Server code in `src/server/`.** Database queries, auth config, services. Never import these in client components.
+5. **Validators in `src/shared/validators/`.** Zod schemas shared between client forms and server validation.
+6. **Feature modules in `src/features/<name>/`.** Each can contain `components/`, `hooks.ts`, `actions.ts`, `types.ts`.
+7. **Reusable UI in `src/components/`.** `layout/` for app-wide layout, `forms/` for form components, `ui/` for shadcn primitives (do not edit `ui/` manually).
+8. **Auth pattern is established.** Client: `src/features/auth/auth-client.ts`. Config: `src/server/auth.ts`. Route: `src/app/api/auth/[...all]/route.ts`. Proxy: `src/proxy.ts`.
+9. **Consistent API responses.** Use `successResponse` / `errorResponse` from `@/shared/utils/api-response`.
+10. **Consistent error handling.** Use `AppError` and `handleError()` from `@/shared/utils/errors`.
+
+## Code Style
+
+- `@/` import alias for all project imports. No relative paths that climb more than one level.
+- `cn()` from `@/lib/utils` for conditional Tailwind classes.
+- shadcn/ui components from `@/components/ui/` as building blocks.
+- Named exports by default. Default exports only where Next.js requires them (`page.tsx`, `layout.tsx`).
+- React Hook Form + Zod resolver for every form.
+- `"use client"` only when the component genuinely needs client interactivity.
+
+## Database (Prisma 7)
+
+- Schema: `prisma/schema.prisma`. Config: `prisma.config.ts`.
+- `npx prisma migrate dev --name <desc>` for migrations.
+- `npx prisma generate` after schema changes.
+- Import `PrismaClient` from `@/generated/prisma/client`.
+- Import the `db` singleton from `@/server/db`.
+
+## Adding New Pages
+
+1. Route: `src/app/<path>/page.tsx`
+2. Protected? Add matcher to `src/proxy.ts`, validate session in layout.
+3. Page stays thin — delegate to feature components.
+
+## Before Submitting Code
+
+- Zero TypeScript errors. Zero lint warnings.
+- Edge cases handled: empty states, errors, loading, unauthorized.
+- No hardcoded values that should be env vars or constants.
+- No duplicated logic — extract into shared utils or hooks.
+- Accessible: semantic HTML, keyboard navigation, ARIA where needed.

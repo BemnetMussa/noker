@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  notebooks     Notebook[]
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime? @default(now())
+  updatedAt  DateTime? @updatedAt
+}
+
+// --- NOKER domain: Notebook -> Source -> Note ---
+
+enum SourceType {
+  TEXT
+  URL
+  PDF
+  IMAGE
+  VIDEO
+}
+
+enum NoteKind {
+  NOTE // user-written
+  QUOTE // saved highlight, verbatim from the source
+  UNPACK // AI plain-language explanation grounded in the source
+}
+
+/// A study space. Groups the sources a learner is working through and the
+/// notes they capture from them.
+model Notebook {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sources     Source[]
+  notes       Note[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
+
+/// Something the learner is learning from. `content` holds the extracted
+/// readable text that the reader displays and that grounds every unpack/quote.
+model Source {
+  id         String     @id @default(cuid())
+  notebookId String
+  notebook   Notebook   @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+  type       SourceType @default(TEXT)
+  title      String
+  url        String?
+  content    String
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  notes      Note[]
+
+  @@index([notebookId])
+}
+
+/// A captured note. Stays grounded: `quote` is the verbatim excerpt it came
+/// from and `source` is where. `body` is the note or the unpacked explanation.
+model Note {
+  id         String   @id @default(cuid())
+  notebookId String
+  notebook   Notebook @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+  sourceId   String?
+  source     Source?  @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  kind       NoteKind @default(NOTE)
+  quote      String?
+  body       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([notebookId])
+  @@index([sourceId])
+}
