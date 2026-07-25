@@ -46,6 +46,14 @@ export async function POST(request: Request) {
       return errorResponse("You need to be signed in", 401, "UNAUTHORIZED");
     }
 
+    if (!process.env.AI_GATEWAY_API_KEY) {
+      return errorResponse(
+        "Unpacking needs an AI key. Add AI_GATEWAY_API_KEY to your .env and restart.",
+        503,
+        "AI_NOT_CONFIGURED",
+      );
+    }
+
     const parsed = unpackSchema.safeParse(await request.json());
     if (!parsed.success) {
       return errorResponse(

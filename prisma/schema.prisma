@@ -8,13 +8,13 @@ datasource db {
 }
 
 model User {
-  id            String    @id
+  id            String     @id
   name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false)
+  email         String     @unique
+  emailVerified Boolean    @default(false)
   image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
   sessions      Session[]
   accounts      Account[]
   notebooks     Notebook[]
@@ -58,69 +58,139 @@ model Verification {
   updatedAt  DateTime? @updatedAt
 }
 
-// --- NOKER domain: Notebook -> Source -> Note ---
+// --- NOKER domain: one Page per topic, made of freely placed Blocks ---
 
-enum SourceType {
-  TEXT
-  URL
-  PDF
-  IMAGE
-  VIDEO
+enum BlockType {
+  TEXT // something you wrote
+  SOURCE // text pasted in from somewhere else
+  IMAGE // a figure: photo or diagram
+  UNPACK // a plain-language explanation of a highlighted passage
 }
 
-enum NoteKind {
-  NOTE // user-written
-  QUOTE // saved highlight, verbatim from the source
-  UNPACK // AI plain-language explanation grounded in the source
+/// Where an element sits on the textbook page.
+enum BlockPlacement {
+  BODY // the main column
+  MARGIN // a marginal note beside the body
 }
 
-/// A study space. Groups the sources a learner is working through and the
-/// notes they capture from them.
+/// Highlight colours double as importance levels.
+enum HighlightColor {
+  KEY // the core idea
+  SUPPORTING // useful detail or example
+  REVISIT // unclear, or must come back to it
+}
+
+/// Where an UNPACK block is in the attempt-then-compare flow.
+/// Null on rows created before attempts existed.
+enum UnpackState {
+  AWAITING // waiting for the learner to write what they think it means
+  ATTEMPTED // they wrote an attempt (or a comparison came back)
+  SKIPPED // they chose "I don't know yet"
+}
+
+/// Which surface a divergence came from.
+enum DivergenceScope {
+  UNPACK // comparing an attempt against a highlighted passage
+  AUDIT // comparing a learner-written condensed note against the page
+}
+
+/// How the learner's understanding lines up with the source.
+enum DivergenceKind {
+  MATCHED // they had this idea
+  MISSED // the source has it; their attempt doesn't
+  WRONG // their attempt asserts something the source contradicts
+}
+
+/// One page = one topic. Everything you gather about it lives here.
+/// (Model kept as `Notebook` for now; the product calls it a page.)
 model Notebook {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sources     Source[]
-  notes       Note[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String       @id @default(cuid())
+  title             String
+  description       String?
+  userId            String
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  blocks            Block[]
+  highlights        Highlight[]
+  divergences       Divergence[]
+  /// The condensed note for this topic, written from everything on the page.
+  condensed         String?
+  condensedAt       DateTime?
+  /// Bumped whenever the page's content changes. Compared against
+  /// `condensedRevision` to tell whether the condensed note is out of date.
+  revision          Int          @default(0)
+  condensedRevision Int          @default(0)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
   @@index([userId])
 }
 
-/// Something the learner is learning from. `content` holds the extracted
-/// readable text that the reader displays and that grounds every unpack/quote.
-model Source {
-  id         String     @id @default(cuid())
-  notebookId String
-  notebook   Notebook   @relation(fields: [notebookId], references: [id], onDelete: Cascade)
-  type       SourceType @default(TEXT)
-  title      String
-  url        String?
-  content    String
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-  notes      Note[]
+/// A freely positioned piece of a page — you can write one anywhere.
+model Block {
+  id            String         @id @default(cuid())
+  notebookId    String
+  notebook      Notebook       @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+  type          BlockType      @default(TEXT)
+  /// Position in the document flow.
+  order         Int            @default(0)
+  placement     BlockPlacement @default(BODY)
+  content       String         @default("")
+  imageUrl      String? // set when type = IMAGE (data URI for uploads, or a web URL)
+  quote         String? // set when type = UNPACK: the passage being explained
+  citation      String? // where this came from, e.g. an article title
+  citationUrl   String?
+  // --- UNPACK attempt-then-compare (type = UNPACK) ---
+  /// What the learner thinks the passage means, written before they see the explanation.
+  attempt       String?
+  attemptAt     DateTime?
+  unpackState   UnpackState?
+  /// Anchors the passage on its source block, so "I don't know yet" can create
+  /// a REVISIT highlight even after a reload. Offsets index the source content.
+  sourceBlockId String?
+  quoteStart    Int?
+  quoteEnd      Int?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  highlights    Highlight[]
+  divergences   Divergence[]
 
   @@index([notebookId])
 }
 
-/// A captured note. Stays grounded: `quote` is the verbatim excerpt it came
-/// from and `source` is where. `body` is the note or the unpacked explanation.
-model Note {
-  id         String   @id @default(cuid())
+/// One point of comparison between what the learner understood and the source.
+/// Always belongs to a page; UNPACK-scoped rows also point at their block.
+/// Kept as a table (not a JSON blob) so "every idea I got wrong" is a query.
+model Divergence {
+  id         String          @id @default(cuid())
   notebookId String
-  notebook   Notebook @relation(fields: [notebookId], references: [id], onDelete: Cascade)
-  sourceId   String?
-  source     Source?  @relation(fields: [sourceId], references: [id], onDelete: SetNull)
-  kind       NoteKind @default(NOTE)
-  quote      String?
-  body       String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  notebook   Notebook        @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+  blockId    String?
+  block      Block?          @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  scope      DivergenceScope
+  kind       DivergenceKind
+  text       String
+  /// The learner pushed back ("I did mean that"). Kept, not deleted — it's signal.
+  dismissed  Boolean         @default(false)
+  createdAt  DateTime        @default(now())
+
+  @@index([notebookId, scope])
+  @@index([blockId])
+}
+
+/// A persistent colour highlight inside a block. Offsets index into that
+/// block's verbatim `content`, so highlights re-render exactly where they were.
+model Highlight {
+  id          String         @id @default(cuid())
+  notebookId  String
+  notebook    Notebook       @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+  blockId     String
+  block       Block          @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  color       HighlightColor @default(KEY)
+  text        String
+  startOffset Int
+  endOffset   Int
+  createdAt   DateTime       @default(now())
 
   @@index([notebookId])
-  @@index([sourceId])
+  @@index([blockId])
 }

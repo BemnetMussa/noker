@@ -1,22 +1,29 @@
-import type { Notebook, Source, Note } from "@/generated/prisma/client";
+import type {
+  Notebook,
+  Block,
+  BlockType,
+  BlockPlacement,
+  Highlight,
+  HighlightColor,
+} from "@/generated/prisma/client";
 
-export type { Notebook, Source, Note };
-
-export interface NoteSourceRef {
-  id: string;
-  title: string;
-  url: string | null;
-}
-
-export type NoteWithSource = Note & { source: NoteSourceRef | null };
-
-export type NotebookWithContent = Notebook & {
-  sources: Source[];
-  notes: NoteWithSource[];
+export type {
+  Notebook,
+  Block,
+  BlockType,
+  BlockPlacement,
+  Highlight,
+  HighlightColor,
 };
 
-export type NotebookSummary = Notebook & {
-  _count: { sources: number; notes: number };
+/** One page = one topic. `Notebook` is the underlying model. */
+export type PageWithBlocks = Notebook & {
+  blocks: Block[];
+  highlights: Highlight[];
+};
+
+export type PageSummary = Notebook & {
+  _count: { blocks: number };
 };
 
 export type ActionResult<T = undefined> =

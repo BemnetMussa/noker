@@ -55,7 +55,7 @@ export function SignupForm() {
         return;
       }
 
-      router.push("/notebooks");
+      router.push("/pages");
       router.refresh();
     } catch {
       setError("Something went wrong. Please try again.");

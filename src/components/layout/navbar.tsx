@@ -30,15 +30,15 @@ export function Navbar() {
           </Link>
           {session && (
             <Link
-              href="/notebooks"
+              href="/pages"
               className={cn(
                 "hover:text-foreground/80 transition-colors",
-                pathname?.startsWith("/notebooks")
+                pathname?.startsWith("/pages")
                   ? "text-foreground"
                   : "text-foreground/60",
               )}
             >
-              Notebooks
+              Pages
             </Link>
           )}
         </nav>

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 
-const sidebarLinks = [{ href: "/notebooks", label: "Notebooks" }];
+const sidebarLinks = [{ href: "/pages", label: "Pages" }];
 
 function SidebarNav() {
   const pathname = usePathname();

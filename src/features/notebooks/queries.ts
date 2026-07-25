@@ -10,32 +10,29 @@ async function requireUserId(): Promise<string> {
   return session.user.id;
 }
 
-export async function listNotebooks() {
+export async function listPages() {
   const userId = await requireUserId();
   return db.notebook.findMany({
     where: { userId },
     orderBy: { updatedAt: "desc" },
-    include: { _count: { select: { sources: true, notes: true } } },
+    include: { _count: { select: { blocks: true } } },
   });
 }
 
-export async function getNotebook(notebookId: string) {
+export async function getPage(pageId: string) {
   const userId = await requireUserId();
 
-  const notebook = await db.notebook.findFirst({
-    where: { id: notebookId, userId },
+  const page = await db.notebook.findFirst({
+    where: { id: pageId, userId },
     include: {
-      sources: { orderBy: { createdAt: "asc" } },
-      notes: {
-        orderBy: { createdAt: "desc" },
-        include: { source: { select: { id: true, title: true, url: true } } },
-      },
+      blocks: { orderBy: { order: "asc" } },
+      highlights: { orderBy: { startOffset: "asc" } },
     },
   });
 
-  if (!notebook) {
-    throw new AppError("Notebook not found", 404, "NOTEBOOK_NOT_FOUND");
+  if (!page) {
+    throw new AppError("Page not found", 404, "PAGE_NOT_FOUND");
   }
 
-  return notebook;
+  return page;
 }
